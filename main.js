@@ -41,7 +41,6 @@ async function register(page) {
 }
 
 async function login() {
-  const browser = await puppeteer.launch(chromeOptions);
   const page = await browser.newPage();
   await page.goto(process.env.ENDPOINT);
   await page.waitFor(delay);
@@ -55,16 +54,17 @@ async function login() {
 
 async function main() {
   try {
-    let j = schedule.scheduleJob(
-      { hour: 0, minute: 0, second: 5 },
-      async function () {
-        console.log("Time to book swimming!");
-        const page = await login();
-        await register(page);
-      }
-    );
+    //Every day at midnight
+    let j = schedule.scheduleJob("0 0 * * *", async function () {
+      console.log("Time to book swimming!");
+      const browser = await puppeteer.launch(chromeOptions);
+      const page = await login(browser);
+      await register(page);
+      page.waitFor(delay);
+      await browser.close();
+    });
   } catch {
-    console.log("Something Error'd Out");
+    console.log("Something Errored Out");
   }
   //id = SubmitEnroll2;
   //*[@id="classSchedule-mainTable"]/tbody/tr[120]/td[2]/input
