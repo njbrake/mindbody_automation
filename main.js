@@ -1,9 +1,25 @@
 const puppeteer = require("puppeteer");
 const schedule = require("node-schedule");
+const mailgun = require("mailgun-js");
 require("dotenv").config();
 
 const delay = 3000;
-
+async function email() {
+  const DOMAIN = "sandbox123d47fcdcf2427b91065072f46d6d79.mailgun.org";
+  const mg = mailgun({
+    apiKey: process.env.MAILGUN_KEY,
+    domain: DOMAIN,
+  });
+  const data = {
+    from: process.env.MAILGUN_ENDPOINT,
+    to: process.env.EMAIL,
+    subject: "Registration Failed",
+    text: "Testing some Mailgun awesomness!",
+  };
+  mg.messages().send(data, function (error, body) {
+    console.log(body);
+  });
+}
 async function register(page) {
   await page.waitFor(delay);
   let date = new Date();
@@ -25,6 +41,7 @@ async function register(page) {
       await page.waitFor(100); //give it a second to make the change.
     } catch {
       await page.screenshot({ path: "cantFindNextWeek.png" }); //Document the page if it failed
+      await email();
       throw new Error("Enroll Button not found");
     }
   }
@@ -33,6 +50,7 @@ async function register(page) {
     await button.click();
   } else {
     await page.screenshot({ path: "cantFind.png" }); //Document the page if it failed
+    await email();
     throw new Error("Signup Button not found");
   }
   await page.waitFor(delay);
@@ -40,6 +58,7 @@ async function register(page) {
     page.click("#SubmitEnroll2");
   } catch {
     await page.screenshot({ path: "cantFindEnrollButton.png" }); //Document the page if it failed
+    await email();
     throw new Error("Enroll Button not found");
   }
   return;
@@ -60,7 +79,7 @@ async function login(browser) {
 async function main() {
   let browser;
   try {
-    if (process.env.PLATFORM != "rPi") {
+    if (process.env.PLATFORM !== "rPi") {
       browser = await puppeteer.launch({
         headless: false,
         defaultViewport: null,
@@ -72,21 +91,21 @@ async function main() {
         executablePath: "chromium-browser",
       });
     }
-    const page = await login(browser);
-    await register(page);
     //Every day at midnight
-    let j = schedule.scheduleJob("0 0 * * *", async function () {
+    let j = schedule.scheduleJob("swimming", "0 0 * * *", async function () {
       console.log("Time to book swimming!");
       const browser = await puppeteer.launch(chromeOptions);
       const page = await login(browser);
       await register(page);
       page.waitFor(delay);
-      await browser.close();
+      //await browser.close();
+      let job = schedule.scheduledJobs["swimming"];
+      console.log(job.nextInvocation());
     });
   } catch {
     console.log("Something Errored Out");
-    await browser.close();
-    schedule.cancelJob();
+    //await browser.close();
+    //schedule.cancelJob();
   }
   //id = SubmitEnroll2;
   //*[@id="classSchedule-mainTable"]/tbody/tr[120]/td[2]/input
