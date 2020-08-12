@@ -4,9 +4,9 @@ const mailgun = require("mailgun-js");
 require("dotenv").config();
 
 // how long to wait between each action so page can load
-const delay = 3000;
+const delay = 8000;
 // Should this be on a evening timer or are you running it by default?
-const manualRun = false;
+const manualRun =false;
 
 async function email(message) {
   const DOMAIN = "sandbox123d47fcdcf2427b91065072f46d6d79.mailgun.org";
@@ -29,27 +29,44 @@ async function register(page) {
   await page.waitFor(delay);
   let date = new Date();
   let whatIWantThatDay = [
-    `//*[@id="classSchedule-mainTable"]/tbody/tr[170]/td[2]/input`, // Sunday at 12:15,
-    `//*[@id="classSchedule-mainTable"]/tbody/tr[5]/td[2]/input`, // Monday at 7:15
-    `//*[@id="classSchedule-mainTable"]/tbody/tr[34]/td[2]/input`, // Tuesday at 7:15
-    `//*[@id="classSchedule-mainTable"]/tbody/tr[62]/td[2]/input`, // Wednesday at 7:15
-    `//*[@id="classSchedule-mainTable"]/tbody/tr[93]/td[2]/input`, // Thursday at 7:15
-    `//*[@id="classSchedule-mainTable"]/tbody/tr[121]/td[2]/input`, // Friday at 7:15
-    `//*[@id="classSchedule-mainTable"]/tbody/tr[157]/td[2]/input`, // Saturday at 12:15,
-    `//*[@id="classSchedule-mainTable"]/tbody/tr[170]/td[2]/input`, // Sunday at 12:15,
-    `//*[@id="classSchedule-mainTable"]/tbody/tr[5]/td[2]/input`, // Monday at 7:15
+    `//*[@id="classSchedule-mainTable"]/tbody/tr[77]/td[2]/input`, // Sunday at 12:15,
+    `//*[@id="classSchedule-mainTable"]/tbody/tr[3]/td[2]/input`, // Monday at 7:15 
+    `//*[@id="classSchedule-mainTable"]/tbody/tr[16]/td[2]/input`, // Tuesday at 7:15 
+    `//*[@id="classSchedule-mainTable"]/tbody/tr[29]/td[2]/input`, // Wednesday at 7:15 
+    `//*[@id="classSchedule-mainTable"]/tbody/tr[42]/td[2]/input`, // Thursday at 7:15
+    `//*[@id="classSchedule-mainTable"]/tbody/tr[55]/td[2]/input`, // Friday at 7:15 
+    `//*[@id="classSchedule-mainTable"]/tbody/tr[68]/td[2]/input`, // Saturday at 12:15, 
+    `//*[@id="classSchedule-mainTable"]/tbody/tr[77]/td[2]/input`, // Sunday at 12:15, 
+    `//*[@id="classSchedule-mainTable"]/tbody/tr[3]/td[2]/input`, // Monday at 7:15
   ];
   if (date.getDay() >= 5 || date.getDay() === 0) {
     try {
       await page.click("#week-arrow-r"); //Click to get to the next weeks listings
-      await page.waitFor(100); //give it a second to make the change.
+      await page.waitFor(5000); //give it a second to make the change.
     } catch {
       await page.screenshot({ path: "cantFindNextWeek.png" }); //Document the page if it failed
       await email("next week button not found");
       throw new Error("next week Button not found");
     }
   }
-  await page.waitFor(delay);
+  
+  try {
+    const [button] = await page.$x(`//form[@id='ClassScheduleSearch2Form']/div[2]/div/div/div/a/span[2]`);
+    await button.click();
+    await page.waitFor(500); 
+    const [button] = await page.$x(`//a[contains(text(),'JCCPGH')])[135]`);
+    await button.click();
+    await page.waitFor(500);
+    const [button] = await page.$x(`//form[@id='ClassScheduleSearch2Form']/div[2]/div/div/div/a[2]/span[2]`);
+    await button.click();
+    await page.waitFor(500);
+    const [button] = await page.$x(`//a[contains(text(),'Squirrel Hill Aqua...')]`);
+    await button.click();
+    await page.waitFor(500);
+  } catch {
+      await email("couldn't filter");
+      throw new Error("filter not found");
+  }
   const [button] = await page.$x(`${whatIWantThatDay[date.getDay() + 3]}`); // Register for 2 days in the future
   if (button) {
     await button.click();
@@ -60,7 +77,13 @@ async function register(page) {
   }
   await page.waitFor(delay);
   try {
-    await page.click("#SubmitEnroll2");
+	  const [button] = await page.$x(`//*[@id="SubmitEnroll2"]`); // Register 
+	  if (button) {
+	    await button.click();
+	  } else {
+	    await page.screenshot({ path: "cantFind.png" }); //Document the page if it failed
+	    throw new Error("enroll Button not found");
+  }
   } catch {
     await page.screenshot({ path: "cantFindEnrollButton.png" }); //Document the page if it failed
     await email("enroll button not found");
@@ -90,7 +113,7 @@ async function main() {
     });
   } else {
     browser = await puppeteer.launch({
-      headless: true,
+      headless: false,
       defaultViewport: null,
       executablePath: "chromium-browser",
     });
@@ -110,11 +133,10 @@ async function main() {
       //Every day at midnight
       let j = schedule.scheduleJob("swimming", "0 0 * * *", async function () {
         console.log("Time to book swimming!");
-        await email("Time to book swimming!");
         const page = await login(browser);
         await register(page);
         page.waitFor(delay);
-        //await browser.close();
+        //await page.close();
         let job = schedule.scheduledJobs["swimming"];
         console.log(job.nextInvocation());
       });
